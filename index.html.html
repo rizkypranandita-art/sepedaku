@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="id" class="dark scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CycloTracker Cloud - Web App Bersepeda</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            500: '#10b981', // Neon Emerald
+                            600: '#059669',
+                            cyan: '#06b6d4',
+                            dark: '#090D16',
+                            card: '#121826',
+                            border: '#1F293D'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome & Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #090D16; color: #f3f4f6; }
+        .neon-glow { box-shadow: 0 0 20px rgba(16, 185, 129, 0.25); }
+        .gradient-text {
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-brand-500 selection:text-brand-dark">
+
+    <!-- HEADER / NAVIGATION -->
+    <header class="sticky top-0 z-40 bg-brand-dark/90 backdrop-blur-md border-b border-brand-border px-4 py-3">
+        <div class="max-w-md mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-cyan flex items-center justify-center text-brand-dark font-black text-lg shadow-md">
+                    <i class="fa-solid fa-person-biking"></i>
+                </div>
+                <span class="text-xl font-black tracking-wide text-white">CYCLO<span class="gradient-text">CLOUD</span></span>
+            </div>
+
+            <!-- Auth Profile State -->
+            <div id="auth-state-container">
+                <button id="btn-login-modal" onclick="openAuthModal()" class="bg-brand-card hover:bg-gray-800 text-brand-cyan border border-brand-cyan/40 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Sync Cloud
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN TRACKER CONTENT -->
+    <main class="max-w-md mx-auto w-full px-4 py-6 space-y-6 flex-1">
+
+        <!-- USER STATS SUMMARY CARD -->
+        <div class="bg-brand-card border border-brand-border rounded-3xl p-5 space-y-4">
+            <div class="flex justify-between items-center border-b border-brand-border/60 pb-3">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-full bg-brand-500/20 text-brand-500 flex items-center justify-center text-xs font-bold" id="user-avatar-icon">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xs font-bold text-white" id="user-display-name">Guest User</h2>
+                        <span class="text-[10px] text-gray-400 block" id="user-sync-status"><i class="fa-solid fa-circle text-amber-500 text-[8px] mr-1"></i> Penyimpanan Lokal</span>
+                    </div>
+                </div>
+                <button onclick="exportData()" title="Export JSON" class="text-gray-400 hover:text-brand-cyan text-xs">
+                    <i class="fa-solid fa-download"></i> Backup
+                </button>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 text-center">
+                <div class="bg-brand-dark/80 p-2.5 rounded-2xl border border-brand-border">
+                    <span class="text-[10px] text-gray-400 block mb-0.5">Total Jarak</span>
+                    <span class="text-base font-black text-brand-500" id="stat-total-dist">0.0 km</span>
+                </div>
+                <div class="bg-brand-dark/80 p-2.5 rounded-2xl border border-brand-border">
+                    <span class="text-[10px] text-gray-400 block mb-0.5">Total Gowes</span>
+                    <span class="text-base font-black text-brand-cyan" id="stat-total-rides">0 kali</span>
+                </div>
+                <div class="bg-brand-dark/80 p-2.5 rounded-2xl border border-brand-border">
+                    <span class="text-[10px] text-gray-400 block mb-0.5">Total Waktu</span>
+                    <span class="text-base font-black text-amber-400" id="stat-total-time">0m</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SPEEDOMETER DASHBOARD -->
+        <div class="bg-brand-card border border-brand-border rounded-3xl p-6 text-center space-y-6 relative overflow-hidden shadow-2xl">
+            <!-- Mode Switcher -->
+            <div class="flex justify-between items-center text-xs">
+                <span class="text-gray-400 font-semibold flex items-center gap-1.5" id="gps-status-indicator">
+                    <i class="fa-solid fa-location-dot text-emerald-400 animate-pulse"></i> GPS Ready
+                </span>
+                <label class="flex items-center gap-2 cursor-pointer bg-brand-dark px-3 py-1.5 rounded-full border border-brand-border">
+                    <span class="text-[11px] text-gray-300">Simulasi</span>
+                    <input type="checkbox" id="sim-toggle" class="sr-only peer">
+                    <div class="w-7 h-4 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-brand-500 relative"></div>
+                </label>
+            </div>
+
+            <!-- Current Speed Meter -->
+            <div class="py-2">
+                <span class="text-6xl sm:text-7xl font-black tracking-tight text-white font-mono" id="current-speed">0.0</span>
+                <span class="text-xs font-bold text-brand-500 uppercase tracking-widest block mt-1">KM / JAM</span>
+            </div>
+
+            <!-- Dynamic Telemetry Metrics -->
+            <div class="grid grid-cols-3 gap-3 border-t border-brand-border/60 pt-4">
+                <div>
+                    <span class="text-[10px] text-gray-400 uppercase font-semibold block">Jarak</span>
+                    <span class="text-lg font-black text-brand-cyan" id="live-distance">0.00</span>
+                    <span class="text-[10px] text-gray-500">km</span>
+                </div>
+                <div>
+                    <span class="text-[10px] text-gray-400 uppercase font-semibold block">Waktu</span>
+                    <span class="text-lg font-black text-amber-400 font-mono" id="live-timer">00:00:00</span>
+                    <span class="text-[10px] text-gray-500">durasi</span>
+                </div>
+                <div>
+                    <span class="text-[10px] text-gray-400 uppercase font-semibold block">Rata-Rata</span>
+                    <span class="text-lg font-black text-rose-400" id="live-avg-speed">0.0</span>
+                    <span class="text-[10px] text-gray-500">km/h</span>
+                </div>
+            </div>
+
+            <!-- Action Controllers -->
+            <div class="pt-2">
+                <button id="btn-start" onclick="startRide()" class="w-full bg-brand-500 hover:bg-brand-600 text-brand-dark font-extrabold py-4 rounded-2xl transition-all text-sm uppercase tracking-wider neon-glow flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-play"></i> Mulai Gowes
+                </button>
+
+                <div id="active-controls" class="hidden grid grid-cols-2 gap-3">
+                    <button id="btn-pause" onclick="pauseRide()" class="bg-amber-500 hover:bg-amber-600 text-brand-dark font-extrabold py-3.5 rounded-2xl transition-all text-xs uppercase tracking-wider flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-pause"></i> Jeda
+                    </button>
+                    <button onclick="stopAndSaveRide()" class="bg-rose-600 hover:bg-rose-700 text-white font-extrabold py-3.5 rounded-2xl transition-all text-xs uppercase tracking-wider flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-square"></i> Selesai & Simpan
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- HISTORY LOG SECTION (FIREBASE CLOUD SYNCED) -->
+        <div class="space-y-3">
+            <div class="flex justify-between items-center px-1">
+                <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-brand-cyan"></i> Riwayat Gowes
+                </h3>
+                <span class="text-[11px] text-gray-400" id="history-count-badge">0 aktivitas</span>
+            </div>
+
+            <!-- History List -->
+            <div id="history-list" class="space-y-2.5">
+                <div class="bg-brand-card/60 border border-brand-border rounded-2xl p-4 text-center text-xs text-gray-500">
+                    Memuat riwayat dari Cloud...
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- AUTH MODAL -->
+    <div id="auth-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-brand-card border border-brand-border w-full max-w-sm rounded-3xl p-6 space-y-5 relative">
+            <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <div class="text-center space-y-1">
+                <div class="w-12 h-12 bg-brand-500/20 text-brand-500 rounded-2xl mx-auto flex items-center justify-center text-xl mb-2">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                </div>
+                <h3 class="text-lg font-extrabold text-white">Simpan Data Online</h3>
+                <p class="text-xs text-gray-400">Akses riwayat gowes Anda dari perangkat mana saja kapan pun.</p>
+            </div>
+
+            <div class="space-y-3 pt-2">
+                <button onclick="loginWithGoogle()" class="w-full bg-white hover:bg-gray-100 text-gray-900 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-colors">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-4 h-4" alt="Google">
+                    Masuk dengan Google
+                </button>
+                
+                <div class="relative flex py-1 items-center">
+                    <div class="flex-grow border-t border-brand-border"></div>
+                    <span class="flex-shrink mx-2 text-[10px] text-gray-500 uppercase">Atau Email</span>
+                    <div class="flex-grow border-t border-brand-border"></div>
+                </div>
+
+                <form id="email-auth-form" onsubmit="handleEmailAuth(event)" class="space-y-2.5">
+                    <input type="email" id="auth-email" placeholder="Email Anda" required class="w-full bg-brand-dark border border-brand-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-brand-500">
+                    <input type="password" id="auth-password" placeholder="Kata Sandi" required class="w-full bg-brand-dark border border-brand-border rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-brand-500">
+                    <button type="submit" class="w-full bg-brand-500 hover:bg-brand-600 text-brand-dark font-bold py-2.5 rounded-xl text-xs transition-colors">
+                        Masuk / Daftar Email
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- FIREBASE MODULE INTEGRATION -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // APP CONFIG & GLOBALS
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'cyclotracker-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : { apiKey: "demo", authDomain: "demo.firebaseapp.com", projectId: "demo" };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+        let unsubscribeRides = null;
+        let ridesData = [];
+
+        // AUTH INITIALIZATION
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (err) {
+                console.log("Auth fallback to anonymous:", err);
+            }
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            updateAuthUI(user);
+            if (user) {
+                subscribeToUserRides(user.uid);
+            }
+        });
+
+        function updateAuthUI(user) {
+            const container = document.getElementById('auth-state-container');
+            const nameEl = document.getElementById('user-display-name');
+            const statusEl = document.getElementById('user-sync-status');
+            const avatarEl = document.getElementById('user-avatar-icon');
+
+            if (user && !user.isAnonymous) {
+                const displayName = user.displayName || user.email.split('@')[0];
+                nameEl.textContent = displayName;
+                statusEl.innerHTML = `<i class="fa-solid fa-cloud text-brand-500 text-[8px] mr-1"></i> Terhubung ke Cloud`;
+                avatarEl.innerHTML = user.photoURL 
+                    ? `<img src="${user.photoURL}" class="w-full h-full rounded-full object-cover">` 
+                    : displayName.charAt(0).toUpperCase();
+
+                container.innerHTML = `
+                    <button onclick="window.userSignOut()" class="bg-brand-card border border-brand-border hover:bg-gray-800 text-gray-300 px-3 py-1.5 rounded-xl text-xs font-semibold">
+                        Keluar
+                    </button>
+                `;
+            } else {
+                nameEl.textContent = 'Guest User';
+                statusEl.innerHTML = `<i class="fa-solid fa-circle text-amber-500 text-[8px] mr-1"></i> Sesi Lokal (Belum Sync)`;
+                avatarEl.innerHTML = `<i class="fa-solid fa-user"></i>`;
+                container.innerHTML = `
+                    <button onclick="openAuthModal()" class="bg-brand-card hover:bg-gray-800 text-brand-cyan border border-brand-cyan/40 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Sync Cloud
+                    </button>
+                `;
+            }
+        }
+
+        // FIRESTORE SYNC (RULE 1 & 2 COMPLIANT)
+        function subscribeToUserRides(userId) {
+            if (unsubscribeRides) unsubscribeRides();
+
+            const ridesCol = collection(db, 'artifacts', appId, 'users', userId, 'rides');
+
+            unsubscribeRides = onSnapshot(ridesCol, (snapshot) => {
+                ridesData = [];
+                snapshot.forEach(docSnap => {
+                    ridesData.push({ id: docSnap.id, ...docSnap.data() });
+                });
+
+                // Sort manually in JS memory (RULE 2)
+                ridesData.sort((a, b) => b.timestamp - a.timestamp);
+                renderHistoryAndStats(ridesData);
+            }, (error) => {
+                console.error("Firestore sync error:", error);
+            });
+        }
+
+        window.saveRideToCloud = async function(rideObj) {
+            if (!currentUser) return;
+            try {
+                const ridesCol = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'rides');
+                await addDoc(ridesCol, {
+                    ...rideObj,
+                    timestamp: Date.now()
+                });
+            } catch (err) {
+                console.error("Gagal menyimpan ke cloud:", err);
+            }
+        };
+
+        window.deleteRideFromCloud = async function(docId) {
+            if (!currentUser) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'rides', docId);
+                await deleteDoc(docRef);
+            } catch (err) {
+                console.error("Gagal menghapus:", err);
+            }
+        };
+
+        // AUTH HANDLERS
+        window.loginWithGoogle = async function() {
+            try {
+                const provider = new GoogleAuthProvider();
+                await signInWithPopup(auth, provider);
+                closeAuthModal();
+            } catch (err) {
+                alert("Gagal masuk dengan Google: " + err.message);
+            }
+        };
+
+        window.handleEmailAuth = async function(e) {
+            e.preventDefault();
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                closeAuthModal();
+            } catch (err) {
+                // If account doesn't exist, register
+                try {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                    closeAuthModal();
+                } catch (regErr) {
+                    alert("Gagal Login/Daftar: " + regErr.message);
+                }
+            }
+        };
+
+        window.userSignOut = function() {
+            signOut(auth);
+        };
+
+        initAuth();
+    </script>
+
+    <!-- CORE GPS TRACKER ENGINE -->
+    <script>
+        let trackingState = {
+            isTracking: false,
+            isPaused: false,
+            distanceKm: 0,
+            secondsElapsed: 0,
+            lastPosition: null,
+            timerInterval: null,
+            simInterval: null
+        };
+
+        function startRide() {
+            trackingState.isTracking = true;
+            trackingState.isPaused = false;
+
+            document.getElementById('btn-start').classList.add('hidden');
+            document.getElementById('active-controls').classList.remove('hidden');
+
+            const isSimMode = document.getElementById('sim-toggle').checked;
+
+            // Timer Loop
+            trackingState.timerInterval = setInterval(() => {
+                if (!trackingState.isPaused) {
+                    trackingState.secondsElapsed++;
+                    updateTimerUI();
+                }
+            }, 1000);
+
+            if (isSimMode) {
+                // SIMULATION MODE
+                trackingState.simInterval = setInterval(() => {
+                    if (!trackingState.isPaused) {
+                        const simulatedSpeed = (22 + Math.random() * 8); // 22-30 km/h
+                        const addedDistance = (simulatedSpeed / 3600); // dist per second
+                        trackingState.distanceKm += addedDistance;
+
+                        document.getElementById('current-speed').textContent = simulatedSpeed.toFixed(1);
+                        document.getElementById('live-distance').textContent = trackingState.distanceKm.toFixed(2);
+                        
+                        const avg = (trackingState.distanceKm / (trackingState.secondsElapsed / 3600)) || 0;
+                        document.getElementById('live-avg-speed').textContent = avg.toFixed(1);
+                    }
+                }, 1000);
+            } else {
+                // REAL GPS GEOLOCATION
+                if ('geolocation' in navigator) {
+                    navigator.geolocation.watchPosition((pos) => {
+                        if (!trackingState.isTracking || trackingState.isPaused) return;
+
+                        const { latitude, longitude, speed } = pos.coords;
+                        const currentSpeedKmH = speed ? (speed * 3.6) : 0;
+                        document.getElementById('current-speed').textContent = currentSpeedKmH.toFixed(1);
+
+                        if (trackingState.lastPosition) {
+                            const d = calculateDistanceKm(
+                                trackingState.lastPosition.latitude,
+                                trackingState.lastPosition.longitude,
+                                latitude,
+                                longitude
+                            );
+                            if (d > 0.002) { // 2 meter threshold
+                                trackingState.distanceKm += d;
+                                document.getElementById('live-distance').textContent = trackingState.distanceKm.toFixed(2);
+                                
+                                const avg = (trackingState.distanceKm / (trackingState.secondsElapsed / 3600)) || 0;
+                                document.getElementById('live-avg-speed').textContent = avg.toFixed(1);
+                            }
+                        }
+                        trackingState.lastPosition = { latitude, longitude };
+                    }, (err) => {
+                        console.warn("GPS Warning:", err.message);
+                    }, { enableHighAccuracy: true });
+                }
+            }
+        }
+
+        function pauseRide() {
+            trackingState.isPaused = !trackingState.isPaused;
+            const btn = document.getElementById('btn-pause');
+            if (trackingState.isPaused) {
+                btn.innerHTML = `<i class="fa-solid fa-play"></i> Lanjut`;
+                btn.classList.replace('bg-amber-500', 'bg-brand-500');
+            } else {
+                btn.innerHTML = `<i class="fa-solid fa-pause"></i> Jeda`;
+                btn.classList.replace('bg-brand-500', 'bg-amber-500');
+            }
+        }
+
+        function stopAndSaveRide() {
+            clearInterval(trackingState.timerInterval);
+            clearInterval(trackingState.simInterval);
+
+            const rideRecord = {
+                distance: parseFloat(trackingState.distanceKm.toFixed(2)),
+                durationSeconds: trackingState.secondsElapsed,
+                avgSpeed: parseFloat(((trackingState.distanceKm / (trackingState.secondsElapsed / 3600)) || 0).toFixed(1)),
+                dateStr: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
+                timeStr: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+            };
+
+            if (rideRecord.distance > 0.01) {
+                if (window.saveRideToCloud) {
+                    window.saveRideToCloud(rideRecord);
+                }
+            } else {
+                alert("Jarak terlalu pendek untuk disimpan.");
+            }
+
+            // RESET STATE
+            trackingState = {
+                isTracking: false,
+                isPaused: false,
+                distanceKm: 0,
+                secondsElapsed: 0,
+                lastPosition: null,
+                timerInterval: null,
+                simInterval: null
+            };
+
+            document.getElementById('current-speed').textContent = '0.0';
+            document.getElementById('live-distance').textContent = '0.00';
+            document.getElementById('live-avg-speed').textContent = '0.0';
+            document.getElementById('live-timer').textContent = '00:00:00';
+
+            document.getElementById('btn-start').classList.remove('hidden');
+            document.getElementById('active-controls').classList.add('hidden');
+        }
+
+        function updateTimerUI() {
+            const hrs = String(Math.floor(trackingState.secondsElapsed / 3600)).padStart(2, '0');
+            const mins = String(Math.floor((trackingState.secondsElapsed % 3600) / 60)).padStart(2, '0');
+            const secs = String(trackingState.secondsElapsed % 60).padStart(2, '0');
+            document.getElementById('live-timer').textContent = `${hrs}:${mins}:${secs}`;
+        }
+
+        // Distance Haversine formula
+        function calculateDistanceKm(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        // RENDER HISTORY & OVERALL STATS
+        function renderHistoryAndStats(rides) {
+            const historyContainer = document.getElementById('history-list');
+            const badgeCount = document.getElementById('history-count-badge');
+
+            let totalDist = 0;
+            let totalSecs = 0;
+
+            badgeCount.textContent = `${rides.length} aktivitas`;
+
+            if (rides.length === 0) {
+                historyContainer.innerHTML = `
+                    <div class="bg-brand-card/60 border border-brand-border rounded-2xl p-6 text-center text-xs text-gray-400">
+                        Belum ada riwayat gowes. Mulai bersepeda dan simpan hasilnya!
+                    </div>
+                `;
+            } else {
+                historyContainer.innerHTML = rides.map(r => {
+                    totalDist += (r.distance || 0);
+                    totalSecs += (r.durationSeconds || 0);
+
+                    const mins = Math.floor((r.durationSeconds || 0) / 60);
+
+                    return `
+                        <div class="bg-brand-card border border-brand-border rounded-2xl p-4 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-brand-500/10 border border-brand-500/30 text-brand-500 flex items-center justify-center font-bold text-sm">
+                                    <i class="fa-solid fa-person-biking"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-extrabold text-white text-sm">${r.distance} KM</h4>
+                                    <span class="text-[10px] text-gray-400 block">${r.dateStr || ''} • ${mins} min • ${r.avgSpeed || 0} km/h avg</span>
+                                </div>
+                            </div>
+                            <button onclick="window.deleteRideFromCloud('${r.id}')" class="text-gray-500 hover:text-rose-400 p-2 text-xs">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Update Total Summary
+            document.getElementById('stat-total-dist').textContent = `${totalDist.toFixed(1)} km`;
+            document.getElementById('stat-total-rides').textContent = `${rides.length} kali`;
+            document.getElementById('stat-total-time').textContent = `${Math.round(totalSecs / 60)}m`;
+        }
+
+        // EXPORT DATA
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.ridesData || []));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", `cyclotracker-backup-${Date.now()}.json`);
+            dlAnchorElem.click();
+        }
+
+        // MODAL TOGGLES
+        function openAuthModal() { document.getElementById('auth-modal').classList.remove('hidden'); }
+        function closeAuthModal() { document.getElementById('auth-modal').classList.add('hidden'); }
+        window.openAuthModal = openAuthModal;
+        window.closeAuthModal = closeAuthModal;
+        window.exportData = exportData;
+    </script>
+</body>
+</html>
