@@ -216,12 +216,17 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // APP CONFIG & GLOBALS
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'cyclotracker-app';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' 
-            ? JSON.parse(__firebase_config) 
-            : { apiKey: "demo", authDomain: "demo.firebaseapp.com", projectId: "demo" };
+        // CONFIG FIREBASE MILIK ANDA
+        const firebaseConfig = {
+            apiKey: "AIzaSyCTvtr_B_XEPCMfMfIV8LhY8LsthN-ZAKk",
+            authDomain: "cyclotracker-51e91.firebaseapp.com",
+            projectId: "cyclotracker-51e91",
+            storageBucket: "cyclotracker-51e91.firebasestorage.app",
+            messagingSenderId: "28330056252",
+            appId: "1:28330056252:web:ae7dfb3457784706d80139"
+        };
 
+        const appId = 'cyclotracker-app';
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -233,11 +238,7 @@
         // AUTH INITIALIZATION
         async function initAuth() {
             try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                await signInAnonymously(auth);
             } catch (err) {
                 console.log("Auth fallback to anonymous:", err);
             }
@@ -282,7 +283,7 @@
             }
         }
 
-        // FIRESTORE SYNC (RULE 1 & 2 COMPLIANT)
+        // FIRESTORE SYNC
         function subscribeToUserRides(userId) {
             if (unsubscribeRides) unsubscribeRides();
 
@@ -294,7 +295,6 @@
                     ridesData.push({ id: docSnap.id, ...docSnap.data() });
                 });
 
-                // Sort manually in JS memory (RULE 2)
                 ridesData.sort((a, b) => b.timestamp - a.timestamp);
                 renderHistoryAndStats(ridesData);
             }, (error) => {
@@ -345,7 +345,6 @@
                 await signInWithEmailAndPassword(auth, email, password);
                 closeAuthModal();
             } catch (err) {
-                // If account doesn't exist, register
                 try {
                     await createUserWithEmailAndPassword(auth, email, password);
                     closeAuthModal();
@@ -448,130 +447,3 @@
             } else {
                 btn.innerHTML = `<i class="fa-solid fa-pause"></i> Jeda`;
                 btn.classList.replace('bg-brand-500', 'bg-amber-500');
-            }
-        }
-
-        function stopAndSaveRide() {
-            clearInterval(trackingState.timerInterval);
-            clearInterval(trackingState.simInterval);
-
-            const rideRecord = {
-                distance: parseFloat(trackingState.distanceKm.toFixed(2)),
-                durationSeconds: trackingState.secondsElapsed,
-                avgSpeed: parseFloat(((trackingState.distanceKm / (trackingState.secondsElapsed / 3600)) || 0).toFixed(1)),
-                dateStr: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
-                timeStr: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-            };
-
-            if (rideRecord.distance > 0.01) {
-                if (window.saveRideToCloud) {
-                    window.saveRideToCloud(rideRecord);
-                }
-            } else {
-                alert("Jarak terlalu pendek untuk disimpan.");
-            }
-
-            // RESET STATE
-            trackingState = {
-                isTracking: false,
-                isPaused: false,
-                distanceKm: 0,
-                secondsElapsed: 0,
-                lastPosition: null,
-                timerInterval: null,
-                simInterval: null
-            };
-
-            document.getElementById('current-speed').textContent = '0.0';
-            document.getElementById('live-distance').textContent = '0.00';
-            document.getElementById('live-avg-speed').textContent = '0.0';
-            document.getElementById('live-timer').textContent = '00:00:00';
-
-            document.getElementById('btn-start').classList.remove('hidden');
-            document.getElementById('active-controls').classList.add('hidden');
-        }
-
-        function updateTimerUI() {
-            const hrs = String(Math.floor(trackingState.secondsElapsed / 3600)).padStart(2, '0');
-            const mins = String(Math.floor((trackingState.secondsElapsed % 3600) / 60)).padStart(2, '0');
-            const secs = String(trackingState.secondsElapsed % 60).padStart(2, '0');
-            document.getElementById('live-timer').textContent = `${hrs}:${mins}:${secs}`;
-        }
-
-        // Distance Haversine formula
-        function calculateDistanceKm(lat1, lon1, lat2, lon2) {
-            const R = 6371;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
-
-        // RENDER HISTORY & OVERALL STATS
-        function renderHistoryAndStats(rides) {
-            const historyContainer = document.getElementById('history-list');
-            const badgeCount = document.getElementById('history-count-badge');
-
-            let totalDist = 0;
-            let totalSecs = 0;
-
-            badgeCount.textContent = `${rides.length} aktivitas`;
-
-            if (rides.length === 0) {
-                historyContainer.innerHTML = `
-                    <div class="bg-brand-card/60 border border-brand-border rounded-2xl p-6 text-center text-xs text-gray-400">
-                        Belum ada riwayat gowes. Mulai bersepeda dan simpan hasilnya!
-                    </div>
-                `;
-            } else {
-                historyContainer.innerHTML = rides.map(r => {
-                    totalDist += (r.distance || 0);
-                    totalSecs += (r.durationSeconds || 0);
-
-                    const mins = Math.floor((r.durationSeconds || 0) / 60);
-
-                    return `
-                        <div class="bg-brand-card border border-brand-border rounded-2xl p-4 flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-brand-500/10 border border-brand-500/30 text-brand-500 flex items-center justify-center font-bold text-sm">
-                                    <i class="fa-solid fa-person-biking"></i>
-                                </div>
-                                <div>
-                                    <h4 class="font-extrabold text-white text-sm">${r.distance} KM</h4>
-                                    <span class="text-[10px] text-gray-400 block">${r.dateStr || ''} • ${mins} min • ${r.avgSpeed || 0} km/h avg</span>
-                                </div>
-                            </div>
-                            <button onclick="window.deleteRideFromCloud('${r.id}')" class="text-gray-500 hover:text-rose-400 p-2 text-xs">
-                                <i class="fa-solid fa-trash"></i>
-                            </button>
-                        </div>
-                    `;
-                }).join('');
-            }
-
-            // Update Total Summary
-            document.getElementById('stat-total-dist').textContent = `${totalDist.toFixed(1)} km`;
-            document.getElementById('stat-total-rides').textContent = `${rides.length} kali`;
-            document.getElementById('stat-total-time').textContent = `${Math.round(totalSecs / 60)}m`;
-        }
-
-        // EXPORT DATA
-        function exportData() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.ridesData || []));
-            const dlAnchorElem = document.createElement('a');
-            dlAnchorElem.setAttribute("href", dataStr);
-            dlAnchorElem.setAttribute("download", `cyclotracker-backup-${Date.now()}.json`);
-            dlAnchorElem.click();
-        }
-
-        // MODAL TOGGLES
-        function openAuthModal() { document.getElementById('auth-modal').classList.remove('hidden'); }
-        function closeAuthModal() { document.getElementById('auth-modal').classList.add('hidden'); }
-        window.openAuthModal = openAuthModal;
-        window.closeAuthModal = closeAuthModal;
-        window.exportData = exportData;
-    </script>
-</body>
-</html>
